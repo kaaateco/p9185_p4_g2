@@ -1,0 +1,24 @@
+---
+title: "kate_analysis"
+author: "Kate Colvin"
+date: "2026-03-20"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(ggplot2)
+
+```
+
+Loading in data
+
+```{r}
+
+
+
+```
+
