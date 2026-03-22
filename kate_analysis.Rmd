@@ -11,6 +11,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
 library(ggplot2)
+library(readxl)
+library(survival)
 
 ```
 
@@ -18,7 +20,34 @@ Loading in data
 
 ```{r}
 
-
+q2c <- read_excel("data/Q2c.xlsx", 
+                    col_types = c("numeric",
+                                  "numeric",
+                                  "numeric",
+                                  "numeric",  # needed to fix infection_time loading as TRUE/FALSE
+                                  "numeric")) %>% 
+  janitor::clean_names()
 
 ```
 
+# 1. Please use the provided data set (i.e., Q2c.xlsx) to obtain the probability of getting infected within 12 months as well as the corresponding 95% confidence interval.
+
+```{r}
+
+# infection_time is time they were infected, if they were infected
+# last_fu_time is last follow-up for those who were not infected
+
+# Creating consistent time variable 
+q2c <- q2c %>% mutate(time = ifelse(q2c$infection == 1, q2c$infection_time, q2c$last_fu_time))
+
+# KM curve
+km_fit <- survfit(Surv(time, infection) ~ 1, 
+                  data = q2c)
+
+km_year <- summary(km_fit, times = 365)
+km_year
+
+```
+
+
+# 2. If someone asks you: “Based on the above data, what is the median time to infection, and the mean of the time to infection after the second shot?” how will you respond?
