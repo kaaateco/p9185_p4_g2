@@ -5,6 +5,11 @@ date: "2026-03-20"
 output: pdf_document
 ---
 
+Analysis of a Phase III Randomized Trial of SARS-CoV-2 Vaccine Efficacy and Safety Over Time
+
+- add additional figure maybe 
+- format survival results table
+
 ```{r setup, include=FALSE}
 
 knitr::opts_chunk$set(echo = TRUE)
@@ -13,6 +18,9 @@ library(tidyverse)
 library(ggplot2)
 library(readxl)
 library(survival)
+library(ggsurvfit)
+library(gtsummary)
+library(gt)
 
 ```
 
@@ -29,6 +37,34 @@ q2c <- read_excel("data/Q2c.xlsx",
   janitor::clean_names()
 
 ```
+
+
+Summary Table (Q2C Table 1)
+```{r}
+
+q2c_table <- q2c %>%
+  mutate(infection_factor = factor(infection, levels = c(0,1), 
+                                   labels = c("Not Infected", "Infected")))
+
+table1 <- q2c_table %>% 
+  tbl_summary(include = c(enrollment_time, infection_factor, infection_time, last_fu_time), 
+              by = infection_factor, 
+              label = list(
+                enrollment_time ~ "Time from Enrollment to Dose 2 (days)", 
+                infection_time ~ "Time to Infection (days)",
+                last_fu_time ~ "Last Follow-up Time (days)")) %>% 
+  add_overall() %>% 
+  bold_labels() %>% 
+  modify_caption("Dose 2 Follow-Up and Observation Times by Infection Status")
+
+table1
+
+q2c_table1 <- table1 %>% as_gt()
+gtsave(q2c_table1, "results/q2c_table1.png")
+
+```
+
+Graph of Times maybe? 
 
 # 1. Please use the provided data set (i.e., Q2c.xlsx) to obtain the probability of getting infected within 12 months as well as the corresponding 95% confidence interval.
 
@@ -47,7 +83,60 @@ km_fit <- survfit(Surv(time, infection) ~ 1,
 km_year <- summary(km_fit, times = 365)
 km_year
 
+# Probability of infection within one year!
+1 - km_year$surv  
+
+```
+
+```{r, eval = FALSE}
+
+# Kaplan-Meier Curve, probability of survival (no infection)
+
+survfit2(Surv(time, infection) ~ 1, 
+         data = q2c) |> 
+  ggsurvfit(color = "blue") +
+  labs(
+    x = "Days",
+    y = "Overall survival probability") + 
+  add_confidence_interval(fill = "blue")
+
+```
+
+
+```{r}
+
+# Probability of infection
+
+plot(km_fit$time, 1 - km_fit$surv, 
+  type = "s", 
+  col = "blue",
+  xlab = "Days",
+  ylab = "Cumulative Infection Probability",
+  ylim = c(0, 0.5))
+
+# Confidence intervals + line at year mark
+lines(sf$time, 1 - km_fit$upper, col = "blue", lty = 2)  # upper CI
+lines(sf$time, 1 - km_fit$lower, col = "blue", lty = 2)  # lower CI
+abline(v = 365, col = "red", lty = 2)  # dashed red line
+grid()
+
 ```
 
 
 # 2. If someone asks you: “Based on the above data, what is the median time to infection, and the mean of the time to infection after the second shot?” how will you respond?
+
+Median time - The time by which 50% of people are infected.
+- NA, less than 50% of participants became infected during follow-up. 
+
+Mean time to infection - The average infection-free time during the first 12 months is 362 days. 
+
+```{r}
+
+# Median
+summary(km_fit)$table["median"]
+
+# Mean
+print(km_fit, rmean = 365)
+
+```
+
