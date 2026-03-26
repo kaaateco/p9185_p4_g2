@@ -18,6 +18,7 @@
 # Load Packages
 # -----------------------------
 library(readxl)
+library(dplyr)
 library(lme4)
 library(gtsummary)
 library(ggplot2)
@@ -114,9 +115,9 @@ summary(glmm.fit0)
 glmm.fit1 <- glmer(SAE ~ TIME * GROUP + SEX + AGE + (1|ID) , data = long.dat,
                    family = binomial, nAGQ = 9)
 # using nAGQ=0 and nAGQ=1 provides stable outcome
-summary(glmm.fit.1)
+summary(glmm.fit1)
 anova(glmm.fit0, glmm.fit1)
-isSingular(glmm.fit1, tol=1e-4) #TRUE
+isSingular(glmm.fit1, tol=1e-4) #
 VarCorr(glmm.fit1)
 
 glmm.tbl <- 
@@ -128,6 +129,24 @@ glmm.tbl <-
                    AGE ~ "Age"
                    ))
 
+## ---- site clustering -------------------------------------------------------------
+glmm.site <- glmer(SAE ~ TIME * GROUP + SEX + AGE + (1|SITE:ID) , data = long.dat,
+                   family = binomial, nAGQ = 9)
+summary(glmm.site)
+anova(glmm.fit1,glmm.site)
+isSingular(glmm.site, tol=1e-4) #
+VarCorr(glmm.site)
+
+tbl_regression(glmm.site, exponentiate = T, 
+                 label = list(
+                   TIME ~ "Time point",
+                   GROUP ~ "Treatment group",
+                   SEX ~ "Gender",
+                   AGE ~ "Age"
+                 ))
+
+
+## ---- glm -------------------------------------------------------------
 ## Not using glmm because we have very little within-subject correlation
 glm.fit1 <- glm(SAE ~ TIME * GROUP + SEX + AGE, data = long.dat,
                 family = binomial)
@@ -139,5 +158,26 @@ tbl_regression(glm.fit1, exponentiate = T,
                  AGE ~ "Age"
                  ))
 
+## ----Sensitivity Analysis: model-complete-case------------------------------
 
+data.comp <- 
+  long.dat %>% 
+  group_by(ID) %>% 
+  mutate(total_obs = sum(is.na(SAE))) %>% 
+  ungroup() %>% 
+  mutate(type = as.factor(ifelse(total_obs == 0, "Completer", "Drop-out")))
+
+model.complete <- glmer(SAE ~ TIME * GROUP + SEX + AGE + (1|ID),
+                        data = data.comp %>% filter(type=="Completer"),
+                        family = binomial, nAGQ = 9)
+summary(model.complete)
+isSingular(model.complete, tol=1e-4) #
+VarCorr(model.complete)
+tbl_regression(model.complete, exponentiate = T, 
+                 label = list(
+                   TIME ~ "Time point",
+                   GROUP ~ "Treatment group",
+                   SEX ~ "Gender",
+                   AGE ~ "Age"
+                 ))
 
