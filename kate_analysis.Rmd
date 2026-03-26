@@ -7,9 +7,6 @@ output: pdf_document
 
 Analysis of a Phase III Randomized Trial of SARS-CoV-2 Vaccine Efficacy and Safety Over Time
 
-- add additional figure maybe 
-- format survival results table
-
 ```{r setup, include=FALSE}
 
 knitr::opts_chunk$set(echo = TRUE)
@@ -33,26 +30,33 @@ q2c <- read_excel("data/Q2c.xlsx",
                                   "numeric",
                                   "numeric",
                                   "numeric",  # needed to fix infection_time loading as TRUE/FALSE
-                                  "numeric")) %>% 
+                                  "numeric"))
   janitor::clean_names()
 
 ```
 
 
-Summary Table (Q2C Table 1)
+Summary Table
+
 ```{r}
 
 q2c_table <- q2c %>%
   mutate(infection_factor = factor(infection, levels = c(0,1), 
-                                   labels = c("Not Infected", "Infected")))
+                                   labels = c("Not Infected", "Infected"))) %>% 
+  mutate(infected_1yr = ifelse(infection == 1 & infection_time <= 365, 1, 0),
+         infected_1yr_factor = factor(infected_1yr, levels = c(0,1),
+                                      labels = c("No", "Yes")))
 
 table1 <- q2c_table %>% 
-  tbl_summary(include = c(enrollment_time, infection_factor, infection_time, last_fu_time), 
-              by = infection_factor, 
+  tbl_summary(include = c(enrollment_time, infection_factor,
+              infection_time, infected_1yr_factor, last_fu_time),
+              by = infection_factor,
               label = list(
-                enrollment_time ~ "Time from Enrollment to Dose 2 (days)", 
-                infection_time ~ "Time to Infection (days)",
-                last_fu_time ~ "Last Follow-up Time (days)")) %>% 
+                infected_1yr_factor ~ "Infected within 1 year",
+                enrollment_time ~ "Time from Dose 2 to Enrollment (days)", 
+                infection_time ~ "Time from Dose 2 to Infection (days)",
+                last_fu_time ~ "Last Follow-up Time Since Dose 2 (days)"), 
+              missing = "no") %>% 
   add_overall() %>% 
   bold_labels() %>% 
   modify_caption("Dose 2 Follow-Up and Observation Times by Infection Status")
@@ -64,9 +68,26 @@ gtsave(q2c_table1, "results/q2c_table1.png")
 
 ```
 
-Graph of Times maybe? 
+
+
 
 # 1. Please use the provided data set (i.e., Q2c.xlsx) to obtain the probability of getting infected within 12 months as well as the corresponding 95% confidence interval.
+
+$$
+\hat{S}(t) = \prod_{t_i \leq t} \left(1 - \frac{d_i}{n_i}\right)
+$$
+
+$$
+\begin{aligned}
+t_i &\quad \text{: observed event times (infection times)} \\
+d_i &\quad \text{: number of infections at time } t_i \\
+n_i &\quad \text{: number of individuals at risk just before } t_i
+\end{aligned}
+$$
+
+$$
+\text{Probability of infection by 12 months} = 1 - \hat{S}(365)
+$$
 
 ```{r}
 
@@ -74,7 +95,7 @@ Graph of Times maybe?
 # last_fu_time is last follow-up for those who were not infected
 
 # Creating consistent time variable 
-q2c <- q2c %>% mutate(time = ifelse(q2c$infection == 1, q2c$infection_time, q2c$last_fu_time))
+q2c <- q2c %>% mutate(time = ifelse(q2c$infection == 1, q2c$infection_time, q2c$last_fu_time)) 
 
 # KM curve
 km_fit <- survfit(Surv(time, infection) ~ 1, 
@@ -88,17 +109,24 @@ km_year
 
 ```
 
-```{r, eval = FALSE}
+```{r}
 
 # Kaplan-Meier Curve, probability of survival (no infection)
 
-survfit2(Surv(time, infection) ~ 1, 
+km_curve <- survfit2(Surv(time, infection) ~ 1, 
          data = q2c) |> 
   ggsurvfit(color = "blue") +
   labs(
     x = "Days",
-    y = "Overall survival probability") + 
-  add_confidence_interval(fill = "blue")
+    y = "Overall Infection-Free Probability", 
+    title = "Kaplan-Meier Infection-Free Curve") + 
+  add_confidence_interval(fill = "blue") +
+  geom_vline(xintercept = 365, linetype = "dashed", color = "red")
+
+km_curve
+
+ggsave("results/km_curve.png", km_curve, 
+       width = 7, height = 5, dpi = 900)
 
 ```
 
@@ -107,20 +135,27 @@ survfit2(Surv(time, infection) ~ 1,
 
 # Probability of infection
 
+png("results/infection_curve.png", width = 1200, height = 900, res = 150)
+
 plot(km_fit$time, 1 - km_fit$surv, 
   type = "s", 
   col = "blue",
   xlab = "Days",
   ylab = "Cumulative Infection Probability",
-  ylim = c(0, 0.5))
+  ylim = c(0, 0.5), 
+  xlim = c(275, 450),
+  main = "Cumulative Probability of COVID-19 Infection Over 12 Months")
 
 # Confidence intervals + line at year mark
-lines(sf$time, 1 - km_fit$upper, col = "blue", lty = 2)  # upper CI
-lines(sf$time, 1 - km_fit$lower, col = "blue", lty = 2)  # lower CI
+lines(km_fit$time, 1 - km_fit$upper, col = "blue", lty = 2)  # upper CI
+lines(km_fit$time, 1 - km_fit$lower, col = "blue", lty = 2)  # lower CI
 abline(v = 365, col = "red", lty = 2)  # dashed red line
 grid()
 
+dev.off()
+
 ```
+
 
 
 # 2. If someone asks you: “Based on the above data, what is the median time to infection, and the mean of the time to infection after the second shot?” how will you respond?
@@ -129,6 +164,10 @@ Median time - The time by which 50% of people are infected.
 - NA, less than 50% of participants became infected during follow-up. 
 
 Mean time to infection - The average infection-free time during the first 12 months is 362 days. 
+
+$$
+\mathrm{RMST}(365) = \int_{0}^{365} S(t)\, dt
+$$
 
 ```{r}
 
