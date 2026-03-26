@@ -30,7 +30,7 @@ q2c <- read_excel("data/Q2c.xlsx",
                                   "numeric",
                                   "numeric",
                                   "numeric",  # needed to fix infection_time loading as TRUE/FALSE
-                                  "numeric"))
+                                  "numeric")) %>% 
   janitor::clean_names()
 
 ```
