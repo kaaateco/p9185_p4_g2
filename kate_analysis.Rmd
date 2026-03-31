@@ -162,6 +162,7 @@ dev.off()
 
 Median time - The time by which 50% of people are infected.
 - NA, less than 50% of participants became infected during follow-up. 
+- (See below for parametric estimate of the median)
 
 Mean time to infection - The average infection-free time during the first 12 months is 362 days. 
 
@@ -178,4 +179,86 @@ summary(km_fit)$table["median"]
 print(km_fit, rmean = 365)
 
 ```
+
+Parametric estimate of the median
+
+```{r}
+
+# Choosing best fit distribution between Weibull, Log-Normal, and Log-Logistic distributions
+
+w_fit <- survreg(Surv(time, infection) ~ 1,
+                       data = q2c,
+                       dist = "weibull")
+
+ln_fit <- survreg(Surv(time, infection) ~ 1, 
+                  data = q2c, 
+                  dist = "lognormal")
+
+ll_fit <- survreg(Surv(time, infection) ~ 1, 
+                  data = q2c, 
+                  dist = "loglogistic")
+
+```
+
+
+```{r}
+
+# Putting into table 
+
+aic_vals <- AIC(w_fit, ln_fit, ll_fit)
+
+aic_table <- data.frame(
+  "Model" = c("Weibull", "Log-Normal", "Log-Logistic"),
+  "AIC" = aic_vals$AIC) %>% 
+  gt() %>% 
+  tab_header(title = "AIC Results of Parametric Survival Models")
+
+aic_table 
+
+gtsave(aic_table, "results/aic_table.png")
+
+```
+
+Log-Normal has lowest AIC, using for median estimation
+
+```{r}
+
+pred <- predict(ln_fit, type = "quantile", p = 0.5, se.fit = TRUE)
+
+median <- pred$fit
+lower_ci <- pred$fit - 1.96 * pred$se.fit
+upper_ci <- pred$fit + 1.96 * pred$se.fit
+
+median[1]
+lower_ci[1]
+upper_ci[1]
+
+```
+
+The parametric estimate of the Median is 587.424 [566.969, 607.879]. 
+
+Checking Log-Normal Fit vs. Survival Curve
+
+```{r, warning = FALSE}
+
+mu <- ln_fit$coefficients
+sigma <- ln_fit$scale
+
+lognormal_survival <- function(t) {
+  1 - pnorm((log(t) - mu) / sigma)}
+
+png("results/ln_curve.png", width = 1200, height = 900, res = 150)
+
+plot(km_fit, 
+     main = "Kaplan-Meier Infection-Free Curve vs. Log-Normal Fit", 
+     xlab = "Time (days)", 
+     ylab = "Infection-Free Probability", 
+     xlim = c(0, 600))
+
+curve(lognormal_survival(x), add = TRUE, col = "blue", lwd = 2)
+
+dev.off()
+
+```
+
 
