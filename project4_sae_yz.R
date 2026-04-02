@@ -108,14 +108,21 @@ long.dat %>%
 
 
 ## ---- glmm model -------------------------------------------------------------
-glmm.fit0 <- glmer(SAE ~ TIME * GROUP + (1|ID) , data = long.dat,
-                   family = binomial, nAGQ = 9)
+
+## Apr.1st, 2026
+# Fit reduced model (no interaction)
+#glmm.fit0 <- glmer(SAE ~ TIME * GROUP + (1|ID) , data = long.dat,
+ #                  family = binomial, nAGQ = 9)
+glmm.fit0 <- glmer(SAE ~ TIME + GROUP + SEX + AGE + (1|ID), family = binomial,
+                   data = long.dat)
 summary(glmm.fit0)
 
 glmm.fit1 <- glmer(SAE ~ TIME * GROUP + SEX + AGE + (1|ID) , data = long.dat,
                    family = binomial, nAGQ = 9)
 # using nAGQ=0 and nAGQ=1 provides stable outcome
 summary(glmm.fit1)
+
+# Perform the Likelihood Ratio Test
 anova(glmm.fit0, glmm.fit1)
 isSingular(glmm.fit1, tol=1e-4) #
 VarCorr(glmm.fit1)
@@ -129,9 +136,9 @@ glmm.tbl <-
                    AGE ~ "Age"
                    ))
 
-## ---- site clustering -------------------------------------------------------------
-glmm.site <- glmer(SAE ~ TIME * GROUP + SEX + AGE + (1|SITE:ID) , data = long.dat,
-                   family = binomial, nAGQ = 9)
+## ---- site clustering --------------------------------------------------------
+glmm.site <- glmer(SAE ~ TIME * GROUP + SEX + AGE + (1|SITE:ID),
+                   data = long.dat, family = binomial, nAGQ = 9)
 summary(glmm.site)
 anova(glmm.fit1,glmm.site)
 isSingular(glmm.site, tol=1e-4) #
@@ -180,4 +187,3 @@ tbl_regression(model.complete, exponentiate = T,
                    SEX ~ "Gender",
                    AGE ~ "Age"
                  ))
-
